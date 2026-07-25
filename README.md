@@ -261,6 +261,102 @@ CODEX_NAKED_AUTH
 
 ---
 
+## Claude Too: `claude-naked`
+
+Same trick, different agent. Ships in this repo as a sibling binary.
+
+```bash
+claude-naked
+```
+
+- `~/.claude-naked` got wiped and recreated as the naked `CLAUDE_CONFIG_DIR`.
+- `~/.claude-naked-home` got wiped and recreated as the naked `HOME`.
+- `~/.claude/.credentials.json` got copied in, so login still works.
+- Claude Code started with the clean homes, **in bypass mode**.
+
+The nice surprise: `CLAUDE_CONFIG_DIR` relocates both `.claude/` **and**
+`.claude.json`, so one variable takes the whole config with it. HOME isolation
+is the second layer — it also catches XDG caches, MCP server state, and shell
+snapshots.
+
+**Bypass is on by default here.** That is the one deliberate difference from
+`codex-naked`, where `--yolo` is opt-in. A naked home has no settings, no
+hooks and no allowlists, so every single action would otherwise prompt, and a
+disposable room you have to babysit is not a disposable room. It forwards:
+
+```text
+--dangerously-skip-permissions
+```
+
+Same sharp-object warning as before: less context is not the same as safe.
+
+Want the prompts back — for example to test the permission flow itself?
+
+```bash
+claude-naked --no-yolo
+```
+
+### Skill test recipe
+
+```bash
+tmp="$(mktemp -d)"
+mkdir -p "$tmp/.claude/skills/thing"
+cp /path/to/skill/SKILL.md "$tmp/.claude/skills/thing/SKILL.md"
+cd "$tmp"
+
+claude-naked -p "Use the thing skill."
+```
+
+The only skill in the room is the one you put there. Your real skills,
+plugins, hooks, memories, `CLAUDE.md` files and MCP servers stay outside.
+
+### Options
+
+```text
+--keep              Reuse existing naked homes instead of wiping them.
+--clean             Wipe both naked homes before launch (default).
+--clean-config-dir  Wipe only the naked CLAUDE_CONFIG_DIR before launch.
+--clean-user-home   Wipe only the isolated HOME before launch.
+--config-dir DIR    Use DIR as the naked CLAUDE_CONFIG_DIR.
+--home DIR          Alias for --config-dir.
+--user-home DIR     Use DIR as the isolated HOME.
+--real DIR          Source Claude home to read auth from.
+--auth MODE         Auth handling: copy, symlink, or none.
+--yolo              Start Claude with --dangerously-skip-permissions (default).
+--no-yolo           Do not pass --dangerously-skip-permissions.
+--keep-home         Do not isolate HOME. Config is still isolated.
+--print-env         Print the resolved homes and exit.
+--version           Print version and exit.
+```
+
+### Defaults
+
+```text
+Real Claude home:   ~/.claude
+Naked config dir:   ~/.claude-naked
+Naked user home:    ~/.claude-naked-home
+Auth mode:          copy
+HOME isolation:     on
+Cleanup:            on
+Bypass mode:        on
+```
+
+Environment overrides:
+
+```text
+CLAUDE_HOME_REAL
+CLAUDE_NAKED_CONFIG_DIR
+CLAUDE_NAKED_HOME
+CLAUDE_NAKED_USER_HOME
+CLAUDE_NAKED_AUTH
+```
+
+Auth modes work exactly as they do for Codex, except the file is
+`.credentials.json` instead of `auth.json`, and `none` pairs with
+`ANTHROPIC_API_KEY`.
+
+---
+
 ## Development
 
 Run the quality gate:
@@ -269,5 +365,12 @@ Run the quality gate:
 make check
 ```
 
-The tests use a fake `codex` executable and verify the environment contract
-without making live model calls.
+That lints and tests both binaries. Individual suites:
+
+```bash
+make test-codex
+make test-claude
+```
+
+The tests use fake `codex` and `claude` executables and verify the environment
+contract without making live model calls.

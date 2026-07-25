@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# claude-naked - run Claude Code with stripped, bias-light homes.
+#
+# Points CLAUDE_CONFIG_DIR and, by default, HOME at clean directories so
+# personal and project context does not leak through ~/.claude, ~/.claude.json,
+# memories, plugins, hooks, MCP servers, or user-level skills. Claude Code's
+# bundled system skills may still appear.
+#
+# Sibling of codex-naked. Same shape, different runtime:
+#   codex-naked                  claude-naked
+#   -----------------            -----------------
+#   CODEX_HOME                   CLAUDE_CONFIG_DIR
+#   ~/.codex/auth.json           ~/.claude/.credentials.json
+#   --dangerously-bypass-...     --dangerously-skip-permissions
+#
+# CLAUDE_CONFIG_DIR relocates BOTH the .claude directory and .claude.json, so
+# it is a complete config isolation on its own. HOME isolation is the second
+# layer: it also catches XDG caches, MCP server state, and shell snapshots.
+set -euo pipefail
+
+VERSION="0.1.0"
+PROGRAM="$(basename "$0")"
+
+ORIGINAL_HOME="${HOME:?HOME is required}"
+REAL_CLAUDE_HOME="${CLAUDE_HOME_REAL:-$ORIGINAL_HOME/.claude}"
+NAKED_CONFIG_DIR="${CLAUDE_NAKED_CONFIG_DIR:-${CLAUDE_NAKED_HOME:-$ORIGINAL_HOME/.claude-naked}}"
+NAKED_USER_HOME="${CLAUDE_NAKED_USER_HOME:-$ORIGINAL_HOME/.claude-naked-home}"
+AUTH_MODE="${CLAUDE_NAKED_AUTH:-copy}"
+AUTH_FILE=".credentials.json"
+ISOLATE_HOME=1
+CLEAN_CONFIG_DIR=1
+CLEAN_USER_HOME=1
+PRINT_ENV=0
+YOLO=1
+CLAUDE_ARGS=()
+
+usage() {
+  cat <<EOF
+$PROGRAM - run Claude Code with stripped, bias-light homes.
+
+Usage:
+  $PROGRAM [options] [--] <claude args...>
+
+Options must come before any Claude subcommand/args. Everything after the
+options is passed straight to claude. Your real ~/.claude, ~/.claude.json and
+\$HOME are never modified.
+
+Bypass mode is ON by default here (unlike codex-naked, where --yolo is opt-in).
+A naked home has no settings, no hooks and no allowlists, so every action would
+otherwise prompt. Use --no-yolo when you want to test the permission flow
+itself.
+
+Options:
+  --keep              Reuse existing naked homes instead of wiping them.
+  --clean             Wipe both naked homes before launch (default).
+  --clean-config-dir  Wipe only the naked CLAUDE_CONFIG_DIR before launch.
+  --clean-user-home   Wipe only the isolated HOME before launch.
+  --config-dir DIR    Use DIR as the naked CLAUDE_CONFIG_DIR (default
+                      ~/.claude-naked; \$CLAUDE_NAKED_CONFIG_DIR or legacy
+                      \$CLAUDE_NAKED_HOME).
+  --home DIR          Alias for --config-dir, kept for old muscle memory.
+  --user-home DIR     Use DIR as the isolated HOME (default ~/.claude-naked-home;
+                      \$CLAUDE_NAKED_USER_HOME).
+  --real DIR          Source Claude home to read auth from (default ~/.claude;
+                      \$CLAUDE_HOME_REAL).
+  --auth MODE         Auth handling: copy, symlink, or none (default copy;
+                      \$CLAUDE_NAKED_AUTH).
+  --yolo              Start Claude with --dangerously-skip-permissions (default).
+  --no-yolo           Do not pass --dangerously-skip-permissions.
+  --keep-home         Do not isolate HOME. Config is still isolated via
+                      CLAUDE_CONFIG_DIR, but XDG caches and MCP server state
+                      may leak.
+  --print-env         Print the resolved homes and exit without running Claude.
+  --version           Print version and exit.
+  -h, --help          Show this help.
+
+Auth modes:
+  copy     Copy .credentials.json from the real Claude home on every run.
+           Simple and disposable, but copied refresh tokens can go stale if
+           another Claude process refreshes the real credentials later.
+  symlink  Link .credentials.json to the real Claude home. Tracks token
+           refreshes, but the naked process shares the real credential file.
+  none     Do not provide auth, and remove any stale naked credentials. Use
+           with ANTHROPIC_API_KEY, or for sterile inspection.
+
+Examples:
+  $PROGRAM
+
+  $PROGRAM -p "say hi"
+
+  $PROGRAM --keep -c
+
+  $PROGRAM --no-yolo
+
+  $PROGRAM --auth none --print-env
+
+  $PROGRAM --print-env
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --clean) CLEAN_CONFIG_DIR=1; CLEAN_USER_HOME=1; shift ;;
+    --clean-config-dir) CLEAN_CONFIG_DIR=1; shift ;;
+    --clean-user-home) CLEAN_USER_HOME=1; shift ;;
+    --keep) CLEAN_CONFIG_DIR=0; CLEAN_USER_HOME=0; shift ;;
+    --config-dir|--home) NAKED_CONFIG_DIR="${2:?$1 needs a DIR}"; shift 2 ;;
+    --user-home) NAKED_USER_HOME="${2:?--user-home needs a DIR}"; shift 2 ;;
+    --real) REAL_CLAUDE_HOME="${2:?--real needs a DIR}"; shift 2 ;;
+    --auth) AUTH_MODE="${2:?--auth needs copy, symlink, or none}"; shift 2 ;;
+    --auth=*) AUTH_MODE="${1#--auth=}"; shift ;;
+    --yolo) YOLO=1; shift ;;
+    --no-yolo) YOLO=0; shift ;;
+    --keep-home) ISOLATE_HOME=0; shift ;;
+    --print-env) PRINT_ENV=1; shift ;;
+    --version) echo "$PROGRAM $VERSION"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
+if [ "$YOLO" -eq 1 ]; then
+  CLAUDE_ARGS+=("--dangerously-skip-permissions")
+fi
+
+resolve_path() {
+  python3 - "$1" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve(strict=False))
+PY
+}
+
+refuse_dangerous_clean() {
+  local label="$1"
+  local target real_claude real_home
+  target="$(resolve_path "$2")"
+  real_claude="$(resolve_path "$REAL_CLAUDE_HOME")"
+  real_home="$(resolve_path "$ORIGINAL_HOME")"
+  case "$target" in
+    ""|"/"|"/home"|"/home/$USER"|"/tmp")
+      echo "$PROGRAM: refusing to clean dangerous $label path: $target" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$target" = "$real_home" ] || [ "$target" = "$real_claude" ]; then
+    echo "$PROGRAM: refusing to clean real $label path: $target" >&2
+    exit 1
+  fi
+}
+
+case "$AUTH_MODE" in
+  copy|symlink|none) ;;
+  *)
+    echo "$PROGRAM: invalid --auth mode '$AUTH_MODE' (expected copy, symlink, or none)" >&2
+    exit 1
+    ;;
+esac
+
+if [ "$PRINT_ENV" -eq 1 ]; then
+  cat <<EOF
+REAL_CLAUDE_HOME=$REAL_CLAUDE_HOME
+NAKED_CONFIG_DIR=$NAKED_CONFIG_DIR
+NAKED_USER_HOME=$NAKED_USER_HOME
+ISOLATE_HOME=$ISOLATE_HOME
+CLEAN_CONFIG_DIR=$CLEAN_CONFIG_DIR
+CLEAN_USER_HOME=$CLEAN_USER_HOME
+AUTH_MODE=$AUTH_MODE
+YOLO=$YOLO
+EOF
+  exit 0
+fi
+
+if [ "$AUTH_MODE" != "none" ]; then
+  if [ ! -d "$REAL_CLAUDE_HOME" ]; then
+    echo "$PROGRAM: real Claude home not found at $REAL_CLAUDE_HOME" >&2
+    exit 1
+  fi
+  if [ ! -f "$REAL_CLAUDE_HOME/$AUTH_FILE" ]; then
+    echo "$PROGRAM: no $AUTH_FILE at $REAL_CLAUDE_HOME/$AUTH_FILE - run 'claude' and log in first, or use --auth none." >&2
+    exit 1
+  fi
+fi
+
+if [ "$CLEAN_CONFIG_DIR" -eq 1 ] && [ -e "$NAKED_CONFIG_DIR" ]; then
+  refuse_dangerous_clean "CLAUDE_CONFIG_DIR" "$NAKED_CONFIG_DIR"
+  rm -rf -- "$NAKED_CONFIG_DIR"
+fi
+if [ "$ISOLATE_HOME" -eq 1 ] && [ "$CLEAN_USER_HOME" -eq 1 ] && [ -e "$NAKED_USER_HOME" ]; then
+  refuse_dangerous_clean "HOME" "$NAKED_USER_HOME"
+  rm -rf -- "$NAKED_USER_HOME"
+fi
+
+mkdir -p "$NAKED_CONFIG_DIR"
+
+case "$AUTH_MODE" in
+  copy)
+    rm -f -- "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    cp -f "$REAL_CLAUDE_HOME/$AUTH_FILE" "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    chmod 600 "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    ;;
+  symlink)
+    rm -f -- "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    ln -s "$(resolve_path "$REAL_CLAUDE_HOME/$AUTH_FILE")" "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    ;;
+  none)
+    rm -f -- "$NAKED_CONFIG_DIR/$AUTH_FILE"
+    ;;
+esac
+
+if [ "$ISOLATE_HOME" -eq 1 ]; then
+  mkdir -p \
+    "$NAKED_USER_HOME" \
+    "$NAKED_USER_HOME/.config" \
+    "$NAKED_USER_HOME/.local/share" \
+    "$NAKED_USER_HOME/.local/state" \
+    "$NAKED_USER_HOME/.cache"
+  export HOME="$NAKED_USER_HOME"
+  export XDG_CONFIG_HOME="$NAKED_USER_HOME/.config"
+  export XDG_DATA_HOME="$NAKED_USER_HOME/.local/share"
+  export XDG_STATE_HOME="$NAKED_USER_HOME/.local/state"
+  export XDG_CACHE_HOME="$NAKED_USER_HOME/.cache"
+fi
+
+export CLAUDE_CONFIG_DIR="$NAKED_CONFIG_DIR"
+exec claude "${CLAUDE_ARGS[@]}" "$@"
