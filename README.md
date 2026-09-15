@@ -51,6 +51,7 @@ That is the whole trick. No flags to remember.
 - `~/.codex-naked` got wiped and recreated as the naked `CODEX_HOME`.
 - `~/.codex-naked-home` got wiped and recreated as the naked `HOME`.
 - `~/.codex/auth.json` got copied in, so login still works.
+- Remote account plugins are disabled, so login cannot restore personal skills.
 - Codex started with the clean homes.
 
 Every plain `codex-naked` run is fresh. Yesterday's weird test sludge goes in
@@ -155,11 +156,24 @@ HOME       -> ~/.codex-naked-home
 
 That is the useful bit.
 
+Recent Codex versions can also restore your account's installed plugins into
+an empty home after login. The launcher passes `--disable remote_plugin`
+to prevent that.
+
+Codex 0.154.0 can replace earlier options when the same flag appears below a
+subcommand. For scripted jobs, put all `-c` options after `exec`, include
+`-c features.remote_plugin=false` there, and use `-c features.NAME=false` for
+other feature toggles instead of another `--disable` below the subcommand.
+
 ---
 
 ## What It Is Not
 
 `codex-naked` is **context isolation**, not a security sandbox.
+
+It still loads the working project's `AGENTS.md` and local skills, plus Codex's
+bundled system skills. Use a fresh working directory for a neutral baseline, or
+stage only the skill you want to test there.
 
 Use it when you want to answer:
 

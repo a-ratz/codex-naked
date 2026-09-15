@@ -92,7 +92,7 @@ test_default_run_cleans_naked_homes_copies_auth_isolates_home_and_forwards_args(
   assert_file_contains "$root/env.out" "^HOME=$root/naked-user$"
   assert_file_contains "$root/env.out" "^CODEX_HOME=$root/naked-codex$"
   assert_file_contains "$root/env.out" "^XDG_CONFIG_HOME=$root/naked-user/.config$"
-  assert_file_contains "$root/env.out" '^ARGS=\[exec\]\[--skip-git-repo-check\]\[say hi\]$'
+  assert_file_contains "$root/env.out" '^ARGS=\[--disable\]\[remote_plugin\]\[exec\]\[--skip-git-repo-check\]\[say hi\]$'
 }
 
 test_keep_preserves_previous_naked_homes() {
@@ -165,7 +165,17 @@ test_yolo_adds_codex_bypass_flag() {
     --yolo \
     exec "say hi"
 
-  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-bypass-approvals-and-sandbox\]\[exec\]\[say hi\]$'
+  assert_file_contains "$root/env.out" '^ARGS=\[--disable\]\[remote_plugin\]\[--dangerously-bypass-approvals-and-sandbox\]\[exec\]\[say hi\]$'
+}
+
+test_subcommand_config_arguments_are_forwarded() {
+  local root="$1"
+  run_with_fixture "$root" \
+    --codex-home "$root/naked-codex" \
+    --user-home "$root/naked-user" \
+    exec -c features.apps=false "say hi"
+
+  assert_file_contains "$root/env.out" '^ARGS=\[--disable\]\[remote_plugin\]\[exec\]\[-c\]\[features.apps=false\]\[say hi\]$'
 }
 
 test_invalid_auth_mode_fails() {
@@ -193,6 +203,7 @@ main() {
     test_none_auth_removes_stale_auth_and_skips_real_home_requirement \
     test_keep_home_preserves_original_home \
     test_yolo_adds_codex_bypass_flag \
+    test_subcommand_config_arguments_are_forwarded \
     test_invalid_auth_mode_fails
   do
     local test_root="$tmp/${test_name#test_}"

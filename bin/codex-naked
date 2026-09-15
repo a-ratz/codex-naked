@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # codex-naked - run Codex with stripped, bias-light homes.
 #
-# Points CODEX_HOME and, by default, HOME at clean directories so personal and
-# project context does not leak through ~/.codex, ~/.agents, memories, plugins,
-# hooks, or user-level skills. Codex's bundled system skills may still appear.
+# Points CODEX_HOME and, by default, HOME at clean directories so personal
+# context does not leak through ~/.codex, ~/.agents, memories, plugins, hooks,
+# or user-level skills. Project context and bundled system skills still load.
 set -euo pipefail
 
 VERSION="0.2.0"
@@ -18,7 +18,8 @@ ISOLATE_HOME=1
 CLEAN_CODEX_HOME=1
 CLEAN_USER_HOME=1
 PRINT_ENV=0
-CODEX_ARGS=()
+# Native feature flags survive subcommand -c options in Codex 0.154.0.
+CODEX_ARGS=(--disable remote_plugin)
 
 usage() {
   cat <<EOF
@@ -30,6 +31,9 @@ Usage:
 Options must come before any Codex subcommand/args. Everything after the
 options is passed straight to codex. Your real ~/.codex and \$HOME are never
 modified.
+
+Remote account plugins are disabled so login cannot restore personal skills.
+Project skills still load.
 
 Options:
   --keep              Reuse existing naked homes instead of wiping them.
