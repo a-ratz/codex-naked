@@ -6,6 +6,12 @@
 # memories, plugins, hooks, MCP servers, or user-level skills. Claude Code's
 # bundled system skills may still appear.
 #
+# The login itself carries context too: claude.ai connectors (Gmail, Calendar,
+# Docs) and account skills arrive with the credentials, not from ~/.claude.
+# claude-naked therefore also passes --strict-mcp-config and
+# --setting-sources project,local by default. The account email stays visible
+# with subscription auth; only --auth none plus ANTHROPIC_API_KEY removes it.
+#
 # Sibling of codex-naked. Same shape, different runtime:
 #   codex-naked                  claude-naked
 #   -----------------            -----------------
@@ -18,7 +24,7 @@
 # layer: it also catches XDG caches, MCP server state, and shell snapshots.
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 PROGRAM="$(basename "$0")"
 
 ORIGINAL_HOME="${HOME:?HOME is required}"
@@ -32,6 +38,7 @@ CLEAN_CONFIG_DIR=1
 CLEAN_USER_HOME=1
 PRINT_ENV=0
 YOLO=1
+ACCOUNT_CONTEXT=0
 CLAUDE_ARGS=()
 
 usage() {
@@ -67,6 +74,10 @@ Options:
                       \$CLAUDE_NAKED_AUTH).
   --yolo              Start Claude with --dangerously-skip-permissions (default).
   --no-yolo           Do not pass --dangerously-skip-permissions.
+  --account-context   Let the login's own context in: claude.ai connectors
+                      (Gmail, Calendar, Docs) and account skills. Off by
+                      default (--strict-mcp-config, --setting-sources
+                      project,local).
   --keep-home         Do not isolate HOME. Config is still isolated via
                       CLAUDE_CONFIG_DIR, but XDG caches and MCP server state
                       may leak.
@@ -112,6 +123,7 @@ while [ "$#" -gt 0 ]; do
     --yolo) YOLO=1; shift ;;
     --no-yolo) YOLO=0; shift ;;
     --keep-home) ISOLATE_HOME=0; shift ;;
+    --account-context) ACCOUNT_CONTEXT=1; shift ;;
     --print-env) PRINT_ENV=1; shift ;;
     --version) echo "$PROGRAM $VERSION"; exit 0 ;;
     -h|--help) usage; exit 0 ;;
@@ -122,6 +134,10 @@ done
 
 if [ "$YOLO" -eq 1 ]; then
   CLAUDE_ARGS+=("--dangerously-skip-permissions")
+fi
+if [ "$ACCOUNT_CONTEXT" -eq 0 ]; then
+  # connectors and account skills come with the login, not from the config dir
+  CLAUDE_ARGS+=("--strict-mcp-config" "--setting-sources" "project,local")
 fi
 
 resolve_path() {
@@ -168,6 +184,7 @@ CLEAN_CONFIG_DIR=$CLEAN_CONFIG_DIR
 CLEAN_USER_HOME=$CLEAN_USER_HOME
 AUTH_MODE=$AUTH_MODE
 YOLO=$YOLO
+ACCOUNT_CONTEXT=$ACCOUNT_CONTEXT
 EOF
   exit 0
 fi

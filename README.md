@@ -287,6 +287,13 @@ claude-naked
 - `~/.claude-naked-home` got wiped and recreated as the naked `HOME`.
 - `~/.claude/.credentials.json` got copied in, so login still works.
 - Claude Code started with the clean homes, **in bypass mode**.
+- `--strict-mcp-config` and `--setting-sources project,local` keep out what the
+  login itself brings along: claude.ai connectors (Gmail, Calendar, Docs) and
+  account skills. `--account-context` lets them back in.
+
+**What still shows up:** Claude Code's own bundled skills, and the account
+email, which comes with subscription auth. Only `--auth none` plus
+`ANTHROPIC_API_KEY` removes the email too.
 
 The nice surprise: `CLAUDE_CONFIG_DIR` relocates both `.claude/` **and**
 `.claude.json`, so one variable takes the whole config with it. HOME isolation
@@ -327,6 +334,7 @@ plugins, hooks, memories, `CLAUDE.md` files and MCP servers stay outside.
 ### Options
 
 ```text
+--account-context   Let claude.ai connectors and account skills back in.
 --keep              Reuse existing naked homes instead of wiping them.
 --clean             Wipe both naked homes before launch (default).
 --clean-config-dir  Wipe only the naked CLAUDE_CONFIG_DIR before launch.

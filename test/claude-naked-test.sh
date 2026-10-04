@@ -94,7 +94,7 @@ test_default_run_cleans_naked_homes_copies_auth_isolates_home_and_forwards_args(
   assert_file_contains "$root/env.out" "^HOME=$root/naked-user$"
   assert_file_contains "$root/env.out" "^CLAUDE_CONFIG_DIR=$root/naked-config$"
   assert_file_contains "$root/env.out" "^XDG_CONFIG_HOME=$root/naked-user/.config$"
-  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-skip-permissions\]\[-p\]\[say hi\]$'
+  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-skip-permissions\]\[--strict-mcp-config\]\[--setting-sources\]\[project,local\]\[-p\]\[say hi\]$'
 }
 
 test_keep_preserves_previous_naked_homes() {
@@ -167,7 +167,7 @@ test_yolo_is_on_by_default() {
     --user-home "$root/naked-user" \
     -p "say hi"
 
-  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-skip-permissions\]\[-p\]\[say hi\]$'
+  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-skip-permissions\]\[--strict-mcp-config\]\[--setting-sources\]\[project,local\]\[-p\]\[say hi\]$'
 }
 
 test_no_yolo_drops_the_bypass_flag() {
@@ -178,7 +178,18 @@ test_no_yolo_drops_the_bypass_flag() {
     --no-yolo \
     -p "say hi"
 
-  assert_file_contains "$root/env.out" '^ARGS=\[-p\]\[say hi\]$'
+  assert_file_contains "$root/env.out" '^ARGS=\[--strict-mcp-config\]\[--setting-sources\]\[project,local\]\[-p\]\[say hi\]$'
+}
+
+test_account_context_lets_the_login_context_in() {
+  local root="$1"
+  run_with_fixture "$root" \
+    --config-dir "$root/naked-config" \
+    --user-home "$root/naked-user" \
+    --account-context \
+    -p "say hi"
+
+  assert_file_contains "$root/env.out" '^ARGS=\[--dangerously-skip-permissions\]\[-p\]\[say hi\]$'
 }
 
 test_invalid_auth_mode_fails() {
@@ -221,6 +232,7 @@ main() {
     test_keep_home_preserves_original_home_but_still_isolates_config \
     test_yolo_is_on_by_default \
     test_no_yolo_drops_the_bypass_flag \
+    test_account_context_lets_the_login_context_in \
     test_invalid_auth_mode_fails \
     test_refuses_to_clean_real_claude_home
   do
