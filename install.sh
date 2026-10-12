@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-repo="AndreRatzenberger/codex-naked"
+repo="a-ratz/codex-naked"
 ref="${CODEX_NAKED_REF:-main}"
 prefix="${CODEX_NAKED_PREFIX:-"$HOME/.local"}"
 bindir="${CODEX_NAKED_BINDIR:-"$prefix/bin"}"

@@ -3,15 +3,18 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AndreRatzenberger/codex-naked/stargazers"><img src="https://img.shields.io/github/stars/AndreRatzenberger/codex-naked?style=flat-square" alt="GitHub stars"></a>
-  <a href="https://github.com/AndreRatzenberger/codex-naked/commits/main"><img src="https://img.shields.io/github/last-commit/AndreRatzenberger/codex-naked?style=flat-square" alt="Last commit"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/AndreRatzenberger/codex-naked?style=flat-square" alt="License"></a>
+  <a href="https://github.com/a-ratz/codex-naked/stargazers"><img src="https://img.shields.io/github/stars/a-ratz/codex-naked?style=flat-square" alt="GitHub stars"></a>
+  <a href="https://github.com/a-ratz/codex-naked/commits/main"><img src="https://img.shields.io/github/last-commit/a-ratz/codex-naked?style=flat-square" alt="Last commit"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/a-ratz/codex-naked?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
   <em>"codex with no baggage"</em>
 </p>
 
+> **Superseded by [tare](https://github.com/a-ratz/tare).** tare does what codex-naked did for Codex,
+> for four coding agents, and proves before every run that the room is clean (`tare: 0.00`).
+> This repository is archived.
 
 You wanna test a Codex skill, but Codex keeps pulling random prior knowledge
 out of the walls and bamboozling your eval? Then this is for you.
@@ -29,7 +32,7 @@ Think of it as **fresh socks for Codex**. Same CLI. Less haunted attic.
 **1. Install the little context broom**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AndreRatzenberger/codex-naked/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/a-ratz/codex-naked/main/install.sh | sh
 ```
 
 Or from a clone:
