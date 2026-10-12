@@ -12,8 +12,8 @@
   <em>"codex with no baggage"</em>
 </p>
 
-> **Superseded by [tare](https://github.com/a-ratz/tare).** tare does what codex-naked did for Codex,
-> for four coding agents, and proves before every run that the room is clean (`tare: 0.00`).
+> **Superseded by [tare](https://github.com/a-ratz/tare).** tare isolates four coding agents,
+> Codex included, and proves before every run that the room is clean (`tare: 0.00`).
 > This repository is archived.
 
 You wanna test a Codex skill, but Codex keeps pulling random prior knowledge
